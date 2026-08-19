@@ -1,0 +1,73 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum EmailStatus {
+  PENDING
+  PROCESSING
+  SENT
+  FAILED
+}
+
+enum LogStatus {
+  SENT
+  FAILED
+}
+
+model Sender {
+  id              String           @id @default(uuid())
+  name            String
+  email           String           @unique
+  smtpIdentity    String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  scheduledEmails ScheduledEmail[]
+
+  @@map("senders")
+}
+
+model Lead {
+  id            String   @id @default(uuid())
+  email         String
+  sourceBatchId String?
+  createdAt     DateTime @default(now())
+
+  @@map("leads")
+}
+
+model ScheduledEmail {
+  id             String      @id @default(uuid())
+  senderId       String
+  sender         Sender      @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  recipientEmail String
+  subject        String
+  body           String      @db.Text
+  scheduledAt    DateTime
+  status         EmailStatus @default(PENDING)
+  bullmqJobId    String?
+  idempotencyKey String      @unique
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+  sendLogs       SendLog[]
+
+  @@index([scheduledAt])
+  @@index([status])
+  @@map("scheduled_emails")
+}
+
+model SendLog {
+  id               String         @id @default(uuid())
+  scheduledEmailId String
+  scheduledEmail   ScheduledEmail @relation(fields: [scheduledEmailId], references: [id], onDelete: Cascade)
+  attemptedAt      DateTime       @default(now())
+  status           LogStatus
+  error            String?        @db.Text
+  previewUrl       String?        @db.Text
+
+  @@map("send_logs")
+}
